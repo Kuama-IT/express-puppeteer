@@ -4,10 +4,10 @@ import { root } from "./controller";
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: "5MB" }));
 
 const router = express.Router();
-router.get("/", root);
+router.post("/", root);
 
 app.use("/api/", router);
 
