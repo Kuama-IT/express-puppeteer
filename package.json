@@ -1,0 +1,31 @@
+{
+    "name": "express-puppeteer",
+    "version": "1.0.0",
+    "main": "dist/app.js",
+    "scripts": {
+        "build": "npx tsc",
+        "start": "node dist/server.js",
+        "dev": "nodemon --watch src --exec ts-node src/server.ts",
+        "lint": "eslint src/**/*.ts",
+        "format": "eslint src/**/*.ts --fix"
+    },
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "express": "^5.1.0"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.34.0",
+        "@types/express": "^5.0.3",
+        "@types/node": "^24.3.0",
+        "eslint": "^9.34.0",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-prettier": "^5.5.4",
+        "nodemon": "^3.1.10",
+        "prettier": "^3.6.2",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.9.2",
+        "typescript-eslint": "^8.41.0"
+    }
+}

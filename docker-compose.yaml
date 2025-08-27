@@ -1,0 +1,7 @@
+services:
+  express-puppeteer:
+    build: .
+    container_name: express-puppeteer
+    ports:
+      - "9000:8080"
+    restart: always
