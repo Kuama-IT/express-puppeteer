@@ -18,7 +18,9 @@ export const root = async (req: Request, res: Response, next: NextFunction) => {
 
         const page = await browser.newPage();
 
-        await page.setContent(requestBody.html);
+        await page.setContent(requestBody.html, {
+            waitUntil: "networkidle0",
+        });
 
         const pdfStream = await page.createPDFStream();
 
