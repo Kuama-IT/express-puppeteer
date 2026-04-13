@@ -4,7 +4,8 @@ import { root } from "./controller";
 
 const app = express();
 
-app.use(express.json({ limit: "5MB" }));
+const jsonBodyLimit = process.env.PDF_JSON_BODY_LIMIT ?? "100mb";
+app.use(express.json({ limit: jsonBodyLimit }));
 
 const router = express.Router();
 router.post("/", root);
