@@ -5,11 +5,21 @@ type RequestBody = {
     html: string;
 };
 
+const CONTENT_TIMEOUT_MS = Number.parseInt(
+    process.env.PDF_CONTENT_TIMEOUT_MS ?? "240000",
+    10,
+);
+const RENDER_TIMEOUT_MS = Number.parseInt(
+    process.env.PDF_RENDER_TIMEOUT_MS ?? "240000",
+    10,
+);
+
 export const root = async (req: Request, res: Response, next: NextFunction) => {
     const browser = await puppeteer.launch({
         headless: true,
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
+
     try {
         const requestBody = req.body as RequestBody;
         if (requestBody?.html === undefined) {
@@ -17,12 +27,48 @@ export const root = async (req: Request, res: Response, next: NextFunction) => {
         }
 
         const page = await browser.newPage();
+        page.setDefaultTimeout(RENDER_TIMEOUT_MS);
+        page.setDefaultNavigationTimeout(CONTENT_TIMEOUT_MS);
 
         await page.setContent(requestBody.html, {
-            waitUntil: "networkidle0",
+            waitUntil: "domcontentloaded",
+            timeout: CONTENT_TIMEOUT_MS,
         });
 
-        const pdfStream = await page.createPDFStream();
+        // Wait for fonts/images without relying on networkidle0 (too brittle on large docs)
+        await page
+            .evaluate(async () => {
+                const fontsReady = (document as Document & {
+                    fonts?: { ready: Promise<unknown> };
+                }).fonts?.ready;
+
+                if (fontsReady) {
+                    await fontsReady.catch(() => undefined);
+                }
+
+                const images = Array.from(document.images);
+                await Promise.allSettled(
+                    images.map(async (img) => {
+                        if (img.complete) {
+                            return;
+                        }
+                        await new Promise<void>((resolve) => {
+                            img.addEventListener("load", () => resolve(), {
+                                once: true,
+                            });
+                            img.addEventListener("error", () => resolve(), {
+                                once: true,
+                            });
+                        });
+                    }),
+                );
+            })
+            .catch(() => undefined);
+
+        const pdfStream = await page.createPDFStream({
+            printBackground: true,
+            format: "A4",
+        });
 
         async function streamToBuffer(
             stream: ReadableStream<Uint8Array>,
@@ -38,8 +84,8 @@ export const root = async (req: Request, res: Response, next: NextFunction) => {
         }
 
         const buffer = await streamToBuffer(pdfStream);
-        await browser.close();
-        res.setHeader("Content-Type", "application/pdf"); // or the correct MIME type
+
+        res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", 'attachment; filename="file.pdf"');
         return res.send(buffer);
     } catch (error) {
