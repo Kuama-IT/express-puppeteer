@@ -1,5 +1,6 @@
 import { Response, Request, NextFunction } from "express";
 import puppeteer from "puppeteer";
+import { acquirePdfSlot } from "./concurrency";
 
 type RequestBody = {
     html: string;
@@ -15,12 +16,23 @@ const RENDER_TIMEOUT_MS = Number.parseInt(
 );
 
 export const root = async (req: Request, res: Response, next: NextFunction) => {
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+    const release = await acquirePdfSlot();
+
+    if (!release) {
+        res.setHeader("Retry-After", "30");
+        return res.status(503).send({
+            error: "PDF rendering queue is full",
+        });
+    }
+
+    let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
 
     try {
+        browser = await puppeteer.launch({
+            headless: true,
+            args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        });
+
         const requestBody = req.body as RequestBody;
         if (requestBody?.html === undefined) {
             return res.status(400).send("Missing 'html' in request body");
@@ -91,6 +103,10 @@ export const root = async (req: Request, res: Response, next: NextFunction) => {
     } catch (error) {
         next(error);
     } finally {
-        await browser.close();
+        try {
+            await browser?.close();
+        } finally {
+            release();
+        }
     }
 };
