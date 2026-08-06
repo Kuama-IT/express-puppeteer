@@ -16,6 +16,7 @@
         "node": "20.x"
     },
     "dependencies": {
+        "dotenv": "^17.4.2",
         "express": "^5.1.0",
         "puppeteer": "^24.17.0"
     },
