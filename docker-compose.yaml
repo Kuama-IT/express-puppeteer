@@ -2,6 +2,7 @@ services:
   express-puppeteer:
     build: .
     container_name: express-puppeteer
+    init: true
     ports:
       - "9000:8080"
     environment:
