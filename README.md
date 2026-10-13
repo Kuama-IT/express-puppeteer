@@ -24,6 +24,17 @@ curl --location 'localhost:9000/api' \
 If `SECRET_KEY` is not set, the server refuses all requests. Requests with a
 missing or incorrect `x-api-key` header receive a `401` response.
 
+## PDF generation
+
+PDFs use print CSS and share a browser. The API controller passes HTML and a
+cancellation signal to `pdfOrchestrator.generate()`. The orchestrator queues
+requests with one active job by default (`PDF_CONCURRENCY=1`), acquires the
+browser and page after dequeueing, manages cancellation and deadlines, and
+closes the page when the job ends. `pdfService.render(page, html)` only renders
+HTML into a PDF using the supplied page.
+`PDF_MAX_PENDING` limits waiting jobs (default 2; set to 0 to disable waiting).
+A full queue returns HTTP `429`.
+
 ## Run with docker
 
 The docker image can be built and run with docker compose. Make sure

@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "crypto";
 import { NextFunction, Request, Response } from "express";
+import { PdfQueueError } from "./pdf.queue";
 
 const isValidKey = (provided: string, expected: string): boolean => {
     const providedBuffer = Buffer.from(provided);
@@ -36,6 +37,10 @@ export const errorHandler = (
 ) => {
     if (res.headersSent) {
         return next(err);
+    }
+    if (err instanceof PdfQueueError) {
+        res.status(err.statusCode).send({ error: err.message });
+        return;
     }
     console.error(err);
     res.status(500);

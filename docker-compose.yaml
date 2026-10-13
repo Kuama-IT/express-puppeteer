@@ -6,4 +6,6 @@ services:
       - "9000:8080"
     environment:
       - SECRET_KEY=${SECRET_KEY}
+      - PDF_MAX_PENDING=${PDF_MAX_PENDING:-2}
+      - PDF_QUEUE_TIMEOUT_MS=${PDF_QUEUE_TIMEOUT_MS:-30000}
     restart: always
