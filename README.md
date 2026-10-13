@@ -3,6 +3,11 @@
 This is a standalone puppeteer server which transforms pure HTML DOM to a PDF.
 The server is built with expressjs and node and can be launched with docker.
 
+## Releases
+
+Every update to `main` automatically builds and releases the app through the
+deployment platform. Merge or push changes to `main` to release a new version.
+
 ## Authentication
 
 All API calls must be authenticated with an API key. Set the `SECRET_KEY`
