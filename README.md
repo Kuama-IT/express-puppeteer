@@ -34,6 +34,17 @@ closes the page when the job ends. `pdfService.render(page, html)` only renders
 HTML into a PDF using the supplied page.
 `PDF_MAX_PENDING` limits waiting jobs (default 2; set to 0 to disable waiting).
 A full queue returns HTTP `429`.
+`PDF_QUEUE_TIMEOUT_MS` limits queue waiting (default 30000 ms); an expired wait
+returns HTTP `503`. Waiting jobs are removed when clients disconnect, and active
+jobs close their page on disconnect. Browser startup is synchronized, and an
+unresponsive or disconnected browser is replaced. Failed PDF jobs return an
+error without retrying.
+
+`PDF_JOB_TIMEOUT_MS` bounds browser acquisition and rendering after dequeue,
+excluding queue waiting. Its default is the sum of `PDF_CONTENT_TIMEOUT_MS`,
+`PDF_RENDER_TIMEOUT_MS`, and `PROTOCOL_TIMEOUT_MS` (18 minutes with the default
+settings). Browser health checks and cleanup each have a maximum 10-second wait,
+or `PROTOCOL_TIMEOUT_MS` if that value is lower.
 
 ## Run with docker
 
