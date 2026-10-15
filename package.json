@@ -6,19 +6,23 @@
         "build": "npx tsc",
         "start": "node dist/server.js",
         "dev": "nodemon --watch src --exec ts-node src/server.ts",
-        "lint": "eslint src/**/*.ts",
-        "format": "eslint src/**/*.ts --fix"
+        "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --max-warnings=0",
+        "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"*.json\" \"*.mjs\" \".github/workflows/ci.yml\"",
+        "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"*.json\" \"*.mjs\" \".github/workflows/ci.yml\"",
+        "test:integration": "node --import dotenv/config --test --test-concurrency=1",
+        "typecheck:tests": "tsc --project tests/tsconfig.json"
     },
     "author": "",
     "license": "ISC",
     "description": "",
     "engines": {
-        "node": "20.x"
+        "node": "26.x"
     },
     "dependencies": {
         "dotenv": "^17.4.2",
         "express": "^5.1.0",
-        "puppeteer": "^24.17.0"
+        "puppeteer": "^24.17.0",
+        "zod": "^4.6.7"
     },
     "devDependencies": {
         "@eslint/js": "^9.34.0",
@@ -28,9 +32,14 @@
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-prettier": "^5.5.4",
         "nodemon": "^3.1.10",
+        "pdfjs-dist": "^6.4.299",
         "prettier": "^3.6.2",
         "ts-node": "^10.9.2",
         "typescript": "^5.9.2",
         "typescript-eslint": "^8.41.0"
+    },
+    "allowScripts": {
+        "fsevents@2.3.3": true,
+        "puppeteer@24.17.0": true
     }
 }
