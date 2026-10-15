@@ -1,14 +1,14 @@
 import express from "express";
+import { config } from "./config";
 import { authenticate, errorHandler } from "./middleware";
-import { root } from "./controller";
+import { controller } from "./controller";
 
 const app = express();
 
-const jsonBodyLimit = process.env.PDF_JSON_BODY_LIMIT ?? "100mb";
-app.use(express.json({ limit: jsonBodyLimit }));
+app.use(express.json({ limit: config.pdf.jsonBodyLimit }));
 
 const router = express.Router();
-router.post("/", authenticate, root);
+router.post("/", authenticate, controller.root);
 
 app.use("/api/", router);
 

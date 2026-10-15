@@ -3,6 +3,11 @@
 This is a standalone puppeteer server which transforms pure HTML DOM to a PDF.
 The server is built with expressjs and node and can be launched with docker.
 
+## Releases
+
+Every update to `main` automatically builds and releases the app through the
+deployment platform. Merge or push changes to `main` to release a new version.
+
 ## Authentication
 
 All API calls must be authenticated with an API key. Set the `SECRET_KEY`
@@ -24,11 +29,56 @@ curl --location 'localhost:9000/api' \
 If `SECRET_KEY` is not set, the server refuses all requests. Requests with a
 missing or incorrect `x-api-key` header receive a `401` response.
 
+## PDF generation
+
+PDFs use print CSS and share a browser. The controller delegates to
+`pdfGenerationService.generate()`, which schedules the request through
+`pdfQueueService.run()` and asks the browser
+manager to run the renderer in a separate browser context for each PDF, isolating
+cookies and storage. Closing the context closes all its pages. The browser manager owns context
+cleanup, browser replacement, job cancellation, and shutdown.
+
+Environment variables are validated at startup. Missing `SECRET_KEY` values or
+malformed numeric settings stop the service instead of silently using a
+fallback.
+
+`PDF_CONCURRENCY` limits active jobs (default 1).
+`PDF_MAX_PENDING` limits waiting jobs (default 2; set to 0 to disable waiting).
+A full queue returns HTTP `429`.
+`PDF_QUEUE_TIMEOUT_MS` limits queue waiting (default 30000 ms); an expired wait
+returns HTTP `503`. Waiting jobs are removed when clients disconnect, and active
+jobs retain their queue slot until Puppeteer has stopped and cleanup completes.
+Browser startup is synchronized, and an unresponsive or disconnected browser
+is replaced. Failed PDF jobs return an error without retrying.
+
+`PDF_JOB_TIMEOUT_MS` bounds browser acquisition and rendering after dequeue,
+excluding queue waiting and bounded cleanup (default 480000 ms). Cancelling an
+acquisition stops the caller's wait; the manager retains a late successful launch
+for other jobs. Chrome launch has its own 30-second limit. Content, render, and Chromium
+protocol operations have separate limits. Browser health checks and cleanup
+each have a maximum 10-second wait, or `PROTOCOL_TIMEOUT_MS` if lower.
+
+`PDF_JSON_BODY_LIMIT` bounds the incoming JSON request body (default 25 MB).
+
 ## Run with docker
+
+Coolify/Nixpacks deployments must enable Docker `--init` in Custom Docker Options.
+The Compose configuration below already uses `init: true`, but it does not configure
+Nixpacks deployments. The init process reaps orphaned Chrome child processes;
+application-level browser cleanup is still required.
+
+Shutdown stops accepting new jobs and drains existing requests for
+`SHUTDOWN_DRAIN_TIMEOUT_MS` (default 10000 ms). After that, queued and active jobs
+are cancelled with HTTP 503 and browser shutdown begins. A further
+`SHUTDOWN_CLEANUP_TIMEOUT_MS` (default 45000 ms) bounds the remaining cleanup;
+exceeding the total deadline forces a nonzero exit. Compose uses a 60-second
+`stop_grace_period`. Configure **at least 60 seconds of termination grace in
+Coolify/Nixpacks too**, and increase it if either shutdown deadline is increased.
+`--init` reaps orphan processes; it does not extend the termination grace.
 
 The docker image can be built and run with docker compose. Make sure
 `SECRET_KEY` is set in your shell (or in a `.env` file next to
-`docker-compose.yaml`) before starting the container.
+`compose.yaml`) before starting the container.
 
 ```shell
 docker compose build
@@ -57,6 +107,13 @@ Remember to install the dependencies first:
 npm i
 npx puppeteer browsers install
 ```
+
+## Integration tests
+
+See [tests/README.md](tests/README.md) for environment preparation, Docker startup,
+the required `amd64` configuration on Mac ARM, and test commands. Tests expect a
+running service. Crash and shutdown scenarios require explicit opt-in and a
+dedicated local container; shutdown leaves that container stopped.
 
 ## Test data
 

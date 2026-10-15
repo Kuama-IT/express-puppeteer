@@ -1,9 +1,0 @@
-services:
-  express-puppeteer:
-    build: .
-    container_name: express-puppeteer
-    ports:
-      - "9000:8080"
-    environment:
-      - SECRET_KEY=${SECRET_KEY}
-    restart: always

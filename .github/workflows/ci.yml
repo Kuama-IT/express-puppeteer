@@ -1,0 +1,113 @@
+name: CI
+
+on:
+    pull_request:
+    push:
+        branches: [main]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    checks:
+        name: Build, format and lint
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        env:
+            PUPPETEER_SKIP_DOWNLOAD: "true"
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@v7
+              with:
+                  node-version-file: package.json
+                  cache: npm
+            - run: npm ci
+            - run: npm run format:check
+            - run: npm run lint
+            - run: npm run build
+            - run: npm run typecheck:tests
+
+    tests:
+        name: Tests (Docker)
+        needs: checks
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
+        env:
+            # Disposable test credential, deliberately not a production secret.
+            SECRET_KEY: ci-only-pdf-key
+            TEST_BASE_URL: http://localhost:9000
+            TEST_ASSET_HOST: host.docker.internal
+            TEST_CONTAINER: express-puppeteer
+            PDF_CONCURRENCY: "1"
+            PDF_MAX_PENDING: "2"
+            PDF_QUEUE_TIMEOUT_MS: "30000"
+            PDF_JOB_TIMEOUT_MS: "480000"
+            PUPPETEER_SKIP_DOWNLOAD: "true"
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@v7
+              with:
+                  node-version-file: package.json
+                  cache: npm
+            - run: npm ci
+            - uses: docker/setup-buildx-action@v3
+            - name: Build test image
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  load: true
+                  push: false
+                  platforms: linux/amd64
+                  tags: express-puppeteer:ci
+                  cache-from: type=gha,scope=pdf-ci
+                  cache-to: type=gha,mode=max,scope=pdf-ci
+            - name: Isolated browser contexts
+              run: >-
+                  docker run --rm --init -e SECRET_KEY -e TEST_BROWSER_MANAGER=1
+                  express-puppeteer:ci npm run test:integration -- tests/integration/context-isolation.test.ts
+            - name: Start dedicated service
+              run: bash scripts/ci-service.sh
+            - name: Default suite and deterministic race tests
+              run: npm run test:integration
+            - name: Browser crash and recovery
+              env:
+                  TEST_BROWSER_RECOVERY: "1"
+              run: npm run test:integration -- tests/integration/browser-recovery.test.ts
+            - name: Bounded stress and zombie check
+              env:
+                  TEST_STRESS: "1"
+              run: npm run test:integration -- tests/integration/stress.test.ts
+            - name: Graceful shutdown
+              env:
+                  TEST_SHUTDOWN: "1"
+              run: npm run test:integration -- tests/integration/shutdown.test.ts
+            - name: Restart dedicated service
+              run: bash scripts/ci-service.sh
+            - name: Shutdown with permanently blocked PDF
+              env:
+                  TEST_SHUTDOWN: "1"
+                  TEST_SHUTDOWN_BLOCKED: "1"
+              run: npm run test:integration -- tests/integration/shutdown.test.ts
+            - name: Start service with short job deadline
+              env:
+                  PDF_JOB_TIMEOUT_MS: "15000"
+              run: bash scripts/ci-service.sh
+            - name: Job timeout and recovery
+              env:
+                  TEST_RENDER_TIMEOUT: "1"
+              run: npm run test:integration -- tests/integration/render-timeout.test.ts
+            - name: Service logs
+              if: always()
+              run: docker logs express-puppeteer || true
+            - name: Remove dedicated container
+              if: always()
+              run: docker rm -f express-puppeteer || true
